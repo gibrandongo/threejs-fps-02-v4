@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<!--
+  SKYLINE SIEGE — an original neon-rooftop King-of-the-Hill tactical FPS.
+  5v5 (player + 4 bots vs 5 bots). One capture zone is live at a time on the
+  Meridian Roof; hold it to bank hill points, first team to 60 points or the
+  lead when the round clock ends takes the round, first to 3 rounds wins the
+  match. Money earned from kills and captures buys better weapons, armour and
+  grenades in the buy phase between rounds. All art, sounds and names are
+  original; all geometry and textures are generated in code; nothing is
+  fetched from the network. Runs offline from static files.
+  Controls: WASD move, mouse look, LMB fire, RMB aim, R reload, Shift sprint,
+  C/Ctrl crouch, Space jump, G frag grenade, V smoke, B buy menu, 1/2 weapons.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyline Siege — Neon Rooftop FPS</title>
+<link rel="stylesheet" href="./styles.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ============ IN-GAME HUD ============ -->
+<div id="hud" class="hidden">
+  <div id="topbar">
+    <div id="scoreAz" class="teamScore az"><span class="tname">AZURE</span><span id="winsAz" class="pips"></span><span id="ptsAz" class="pts">0</span></div>
+    <div id="midbox">
+      <div id="timer">1:40</div>
+      <div id="zonebar"><div id="zoneFill"></div><div id="zoneLabel">HELIPAD</div></div>
+      <div id="roundLabel">ROUND 1</div>
+    </div>
+    <div id="scoreCr" class="teamScore cr"><span id="ptsCr" class="pts">0</span><span id="winsCr" class="pips"></span><span class="tname">CRIMSON</span></div>
+  </div>
+
+  <canvas id="minimap" width="188" height="160"></canvas>
+  <div id="moneyBox">$<span id="money">800</span></div>
+  <div id="streakBox" class="hidden">STREAK <span id="streakN">0</span></div>
+
+  <div id="killfeed"></div>
+  <div id="callouts"></div>
+
+  <div id="dmgDir"><span></span></div>
+
+  <div id="scoreboard" class="hidden">
+    <h2>SCOREBOARD</h2>
+    <table><thead><tr><th></th><th>K</th><th>D</th><th>Caps</th></tr></thead><tbody id="scoreRows"></tbody></table>
+    <p>Hold TAB to view · First to 3 rounds wins</p>
+  </div>
+
+  <div id="crosshair"><span class="ch t"></span><span class="ch b"></span><span class="ch l"></span><span class="ch r"></span><span class="ch dot"></span></div>
+  <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
+  <div id="banner" class="hidden"></div>
+  <div id="subbanner" class="hidden"></div>
+  <div id="toast" class="hidden"></div>
+  <div id="deathBox" class="hidden"><div id="deathText">ELIMINATED</div><div id="respawnText">Respawn in 3.0</div></div>
+
+  <div id="vitals">
+    <div id="hpRow"><span id="hpNum">100</span><div id="hpBar"><div id="hpFill"></div></div></div>
+    <div id="armorRow">ARMOR <span id="armorNum">0</span></div>
+  </div>
+
+  <div id="loadout">
+    <div id="weaponName">P9 SIDEARM</div>
+    <div id="ammoRow"><span id="magAmmo">12</span><span id="ammoSep">/</span><span id="resAmmo">48</span></div>
+    <div id="throwRow"><span id="fragCount">FRAG ×1</span><span id="smokeCount">SMOKE ×1</span></div>
+    <div id="hintRow">B buy &nbsp;·&nbsp; G frag &nbsp;·&nbsp; V smoke &nbsp;·&nbsp; R reload</div>
+  </div>
+
+  <div id="dmgVin"></div>
+  <div id="healVin"></div>
+</div>
+
+<!-- ============ MAIN MENU ============ -->
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>SKYLINE<span>SIEGE</span></h1>
+    <p class="tag">Neon rooftops. One hill. Hold it or lose the night.</p>
+    <p class="brief">5v5 King-of-the-Hill on the Meridian Roof. Capture the live zone, bank hill
+      points, spend your earnings in the buy phase. First team to 60 hill points takes the
+      round; first to 3 rounds takes the match.</p>
+    <div class="optRow">
+      <label>Difficulty
+        <select id="optDiff">
+          <option value="recruit">Recruit — bots react slowly</option>
+          <option value="veteran" selected>Veteran — a fair fight</option>
+          <option value="elite">Elite — bots react fast</option>
+        </select>
+      </label>
+      <label>Sensitivity <input id="optSens" type="range" min="30" max="220" value="100"><span id="sensVal">1.00</span></label>
+      <label>Volume <input id="optVol" type="range" min="0" max="100" value="70"><span id="volVal">70%</span></label>
+    </div>
+    <button id="deployBtn" class="bigBtn">DEPLOY ▸</button>
+    <p class="controls">WASD move · Mouse look · LMB fire · RMB aim · R reload · Shift sprint ·
+      C crouch · Space jump · G frag · V smoke · B buy · 1/2 swap weapon · Esc pause</p>
+  </div>
+</div>
+
+<!-- ============ BUY MENU ============ -->
+<div id="buyMenu" class="overlay hidden">
+  <div class="panel wide">
+    <h2>BUY PHASE <span id="buyTimer">10</span>s</h2>
+    <p class="brief">Funds: <b>$<span id="buyMoney">800</span></b> · Press B or click Done to close. Purchases apply instantly.</p>
+    <div id="buyGrid"></div>
+    <div class="buyFoot"><span id="buyMsg"></span><button id="buyDone" class="bigBtn small">DONE ▸</button></div>
+  </div>
+</div>
+
+<!-- ============ PAUSE ============ -->
+<div id="pauseMenu" class="overlay hidden">
+  <div class="panel">
+    <h2>PAUSED</h2>
+    <p class="brief">The hill waits for no one. Get back out there.</p>
+    <button id="resumeBtn" class="bigBtn">RESUME ▸</button>
+    <button id="quitBtn" class="ghostBtn">ABANDON MATCH</button>
+  </div>
+</div>
+
+<!-- ============ MATCH END ============ -->
+<div id="matchEnd" class="overlay hidden">
+  <div class="panel">
+    <h1 id="matchTitle">VICTORY</h1>
+    <p id="matchSub" class="tag">Azure takes the roof.</p>
+    <table id="statTable">
+      <tr><th></th><th>Kills</th><th>Deaths</th><th>Captures</th><th>Accuracy</th><th>Best streak</th></tr>
+      <tr><td>YOU</td><td id="stK">0</td><td id="stD">0</td><td id="stC">0</td><td id="stA">0%</td><td id="stS">0</td></tr>
+    </table>
+    <button id="againBtn" class="bigBtn">PLAY AGAIN ▸</button>
+    <button id="menuBtn" class="ghostBtn">MAIN MENU</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
